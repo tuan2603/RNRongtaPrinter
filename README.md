@@ -11,11 +11,8 @@ npm install react-native-rongta-printer
 ## Usage
 
 ```js
-import { multiply } from 'react-native-rongta-printer';
+import { deviceDiscovery, connectDevice } from 'react-native-rongta-printer';
 
-// ...
-
-const result = await multiply(3, 7);
 ```
 
 ## Contributing
