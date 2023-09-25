@@ -54,3 +54,10 @@ export function connectDevice(
 export function cutAllPage(): Promise<any> {
   return RNRongtaPrinter.cutAll();
 }
+export function printBase64(
+  base64: string,
+  width: number,
+  cmdType: number
+): Promise<any> {
+  return RNRongtaPrinter.printBase64(base64, width, cmdType);
+}

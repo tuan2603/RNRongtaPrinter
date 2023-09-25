@@ -1,6 +1,14 @@
 package com.rongtaprinter;
+
 import static com.rongtaprinter.utils.MapUtil.toWritableMap;
 
+import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.hardware.usb.UsbManager;
+import android.media.metrics.LogSessionId;
+import android.os.Message;
+import android.util.Base64;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -13,18 +21,26 @@ import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.module.annotations.ReactModule;
 import com.rongtaprinter.utils.BaseEnum;
+import com.rt.printerlibrary.bean.LableSizeBean;
+import com.rt.printerlibrary.bean.UsbConfigBean;
 import com.rt.printerlibrary.bean.WiFiConfigBean;
 import com.rt.printerlibrary.cmd.Cmd;
 import com.rt.printerlibrary.cmd.EscFactory;
 import com.rt.printerlibrary.connect.PrinterInterface;
+import com.rt.printerlibrary.enumerate.BmpPrintMode;
+import com.rt.printerlibrary.enumerate.CommonEnum;
 import com.rt.printerlibrary.enumerate.ConnectStateEnum;
+import com.rt.printerlibrary.exception.SdkException;
 import com.rt.printerlibrary.factory.cmd.CmdFactory;
 import com.rt.printerlibrary.factory.connect.PIFactory;
+import com.rt.printerlibrary.factory.connect.UsbFactory;
 import com.rt.printerlibrary.factory.connect.WiFiFactory;
 import com.rt.printerlibrary.factory.printer.PrinterFactory;
 import com.rt.printerlibrary.factory.printer.UniversalPrinterFactory;
 import com.rt.printerlibrary.ipscan.IpScanner;
 import com.rt.printerlibrary.printer.RTPrinter;
+import com.rt.printerlibrary.setting.BitmapSetting;
+import com.rt.printerlibrary.setting.CommonSetting;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -76,6 +92,7 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule {
 
   private Promise mConnectDevicePromise;
   private Promise mConnectIPPromise;
+  private Promise mPrintPromise;
 
   public static final String NAME = "RNRongtaPrinter";
 
@@ -119,6 +136,25 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule {
     handleConnectType();
   }
 
+  private void connectUSB(UsbConfigBean usbConfigBean) {
+    UsbManager mUsbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
+    PIFactory piFactory = new UsbFactory();
+    PrinterInterface printerInterface = piFactory.create();
+    printerInterface.setConfigObject(usbConfigBean);
+    rtPrinter.setPrinterInterface(printerInterface);
+
+    if (mUsbManager.hasPermission(usbConfigBean.usbDevice)) {
+      try {
+        rtPrinter.connect(usbConfigBean);
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+    } else {
+      mUsbManager.requestPermission(usbConfigBean.usbDevice, usbConfigBean.pendingIntent);
+    }
+
+  }
+
 
   private void handleConnectType() {
     switch (getCurrentConnectType()) {
@@ -137,17 +173,17 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule {
               WritableArray writableArray = Arguments.createArray();
               for (int i = 0; i < deviceBeanList.size(); i++) {
                 Map<String, Object> info = new HashMap<>();
-                if(deviceBeanList.get(i).getDeviceIp() != null) {
+                if (deviceBeanList.get(i).getDeviceIp() != null) {
                   info.put("IP", deviceBeanList.get(i).getDeviceIp());
                 }
-                if(deviceBeanList.get(i).getMacAddress() != null) {
+                if (deviceBeanList.get(i).getMacAddress() != null) {
                   info.put("MAC", deviceBeanList.get(i).getMacAddress());
                 }
                 info.put("PORT", deviceBeanList.get(i).getDevicePort());
                 info.put("DHCP", deviceBeanList.get(i).isDHCPEnable());
                 writableArray.pushMap(toWritableMap(info));
               }
-              if (mConnectDevicePromise != null ) {
+              if (mConnectDevicePromise != null) {
                 mConnectDevicePromise.resolve(writableArray);
               }
             }
@@ -161,6 +197,11 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule {
             }
           }
         }.start();
+        break;
+
+      case BaseEnum.CON_USB:
+        UsbConfigBean usbConfigBean = (UsbConfigBean) configObj;
+        connectUSB(usbConfigBean);
         break;
 
       default:
@@ -198,12 +239,12 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule {
     rtPrinter.setPrinterInterface(printerInterface);
     try {
       rtPrinter.connect(wiFiConfigBean);
-      if(mConnectIPPromise != null){
+      if (mConnectIPPromise != null) {
         mConnectIPPromise.resolve(true);
       }
     } catch (Exception e) {
       e.printStackTrace();
-      if(mConnectIPPromise != null){
+      if (mConnectIPPromise != null) {
         mConnectIPPromise.resolve(false);
       }
     }
@@ -226,27 +267,95 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule {
   }
 
 
-
   @ReactMethod
-  public void cutAll( Promise promise) {
+  public void cutAll(Promise promise) {
     try {
       if (rtPrinter != null) {
         CmdFactory cmdFactory = new EscFactory();
         Cmd cmd = cmdFactory.create();
         cmd.append(cmd.getAllCutCmd());
         rtPrinter.writeMsgAsync(cmd.getAppendCmds());
-        if(promise != null){
+        if (promise != null) {
           promise.resolve(true);
         }
       }
-      if(promise != null){
+      if (promise != null) {
         promise.resolve(false);
       }
     } catch (Exception e) {
       e.printStackTrace();
-      if(promise != null){
+      if (promise != null) {
         promise.resolve(false);
       }
+    }
+  }
+
+  private Bitmap base64ToBitmap(String base64) {
+    Bitmap bitmap = null;
+    try {
+      byte[] byteArr = Base64.decode(base64, 0);
+      bitmap = BitmapFactory.decodeByteArray(byteArr, 0, byteArr.length);
+    } catch (Exception e) {
+      Log.d("rongta", "escPrint: base64ToBitmap");
+      e.printStackTrace();
+    }
+    return bitmap;
+  }
+
+  private void escPrint(Bitmap bitmap, int width) {
+    new Thread(new Runnable() {
+      @Override
+      public void run() {
+        Log.d("rongta", "escPrint: start");
+        CmdFactory cmdFactory = new EscFactory();
+        Cmd cmd = cmdFactory.create();
+        cmd.append(cmd.getHeaderCmd());
+        CommonSetting commonSetting = new CommonSetting();
+        commonSetting.setAlign(CommonEnum.ALIGN_MIDDLE);
+        int mHeight = bitmap.getHeight();
+        int mWidth = bitmap.getWidth();
+        cmd.append(cmd.getCommonSettingCmd(commonSetting));
+        BitmapSetting bitmapSetting = new BitmapSetting();
+        BmpPrintMode mode = BmpPrintMode.MODE_SINGLE_FAST;
+        bitmapSetting.setBmpPrintMode(mode);
+        bitmapSetting.setBimtapLimitWidth(width);
+        Bitmap mBitmap = Bitmap.createScaledBitmap(bitmap, width, width * mHeight / mWidth, false);
+        try {
+          cmd.append(cmd.getBitmapCmd(bitmapSetting, mBitmap));
+        } catch (SdkException e) {
+          mPrintPromise.reject(e);
+          e.printStackTrace();
+        }
+        cmd.append(cmd.getLFCRCmd());
+        cmd.append(cmd.getCmdCutNew());
+        if (rtPrinter != null) {
+          rtPrinter.writeMsgAsync(cmd.getAppendCmds());//Sync Write
+          mPrintPromise.resolve(true);
+        }
+      }
+    }).
+      start();
+  }
+
+  @ReactMethod
+  public void printBase64(String base64, int width, int cmdType, Promise promise) {
+    mPrintPromise = promise;
+    try {
+      Bitmap bitmap = base64ToBitmap(base64);
+      if (bitmap != null) {
+        switch (cmdType) {
+          case BaseEnum.CMD_ESC:
+            escPrint(bitmap, width);
+            break;
+          default:
+            break;
+        }
+      } else {
+        mPrintPromise.reject("Not found data printer");
+      }
+    } catch (Exception e) {
+      Log.d("rongta", "escPrint: printBase64");
+      mPrintPromise.reject(e);
     }
   }
 }
