@@ -24,14 +24,17 @@ import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.module.annotations.ReactModule;
 import com.rongtaprinter.utils.BaseEnum;
 import com.rt.printerlibrary.bean.LableSizeBean;
+import com.rt.printerlibrary.bean.Position;
 import com.rt.printerlibrary.bean.UsbConfigBean;
 import com.rt.printerlibrary.bean.WiFiConfigBean;
 import com.rt.printerlibrary.cmd.Cmd;
 import com.rt.printerlibrary.cmd.EscFactory;
+import com.rt.printerlibrary.cmd.TscFactory;
 import com.rt.printerlibrary.connect.PrinterInterface;
 import com.rt.printerlibrary.enumerate.BmpPrintMode;
 import com.rt.printerlibrary.enumerate.CommonEnum;
 import com.rt.printerlibrary.enumerate.ConnectStateEnum;
+import com.rt.printerlibrary.enumerate.PrintDirection;
 import com.rt.printerlibrary.exception.SdkException;
 import com.rt.printerlibrary.factory.cmd.CmdFactory;
 import com.rt.printerlibrary.factory.connect.PIFactory;
@@ -383,6 +386,48 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
       start();
   }
 
+  private void tscPrint(Bitmap bitmap, int width) {
+    new Thread(new Runnable() {
+      @Override
+      public void run() {
+        Log.d("rongta", "tscPrint: start");
+        CmdFactory cmdFactory = new TscFactory();
+        Cmd cmd = cmdFactory.create();
+        cmd.append(cmd.getHeaderCmd());
+        CommonSetting commonSetting = new CommonSetting();
+        int mHeight = bitmap.getHeight();
+        int mWidth = bitmap.getWidth();
+        int bmpPrintWidth = width;
+        int bmpPrintHeight = width * mHeight / mWidth;
+        commonSetting.setLableSizeBean(new LableSizeBean(bmpPrintWidth, bmpPrintHeight));
+        commonSetting.setLabelGap(3);
+        commonSetting.setPrintDirection(PrintDirection.NORMAL);
+        cmd.append(cmd.getHeaderCmd());
+        cmd.append(cmd.getCommonSettingCmd(commonSetting));
+        BitmapSetting bitmapSetting = new BitmapSetting();
+        BmpPrintMode mode = BmpPrintMode.MODE_SINGLE_FAST;
+        bitmapSetting.setPrintPostion(new Position(0, 0));
+        bitmapSetting.setBimtapLimitWidth(width);
+        bitmapSetting.setBmpPrintMode(BmpPrintMode.MODE_MULTI_COLOR);
+        Bitmap mBitmap = Bitmap.createScaledBitmap(bitmap, bmpPrintWidth, bmpPrintHeight, false);
+        try {
+          cmd.append(cmd.getBitmapCmd(bitmapSetting, mBitmap));
+          cmd.append(cmd.getPrintCopies(1));
+        } catch (SdkException e) {
+          mPrintPromise.reject(e);
+          e.printStackTrace();
+        }
+        cmd.append(cmd.getLFCRCmd());
+        cmd.append(cmd.getCmdCutNew());
+        if (rtPrinter != null) {
+          rtPrinter.writeMsgAsync(cmd.getAppendCmds());//Sync Write
+          mPrintPromise.resolve(true);
+        }
+      }
+    }).
+      start();
+  }
+
   @ReactMethod
   public void printBase64(String base64, int width, int cmdType, Promise promise) {
     mPrintPromise = promise;
@@ -392,6 +437,10 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
         switch (cmdType) {
           case BaseEnum.CMD_ESC:
             escPrint(bitmap, width);
+            break;
+
+          case BaseEnum.CMD_TSC:
+            tscPrint(bitmap, width);
             break;
           default:
             break;

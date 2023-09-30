@@ -61,3 +61,11 @@ export function printBase64(
 ): Promise<any> {
   return RNRongtaPrinter.printBase64(base64, width, cmdType);
 }
+
+export function disconnect(): Promise<any> {
+  return RNRongtaPrinter.doDisConnect();
+}
+
+export function cashBox() {
+  return RNRongtaPrinter.cashBox();
+}
