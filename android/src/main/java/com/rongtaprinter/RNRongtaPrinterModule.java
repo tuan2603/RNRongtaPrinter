@@ -1,15 +1,16 @@
 package com.rongtaprinter;
 
+
 import static com.rongtaprinter.utils.MapUtil.toWritableMap;
 
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
-import android.media.metrics.LogSessionId;
-import android.os.Message;
 import android.util.Base64;
 import android.util.Log;
+import android.view.View;
 
 import androidx.annotation.NonNull;
 
@@ -18,6 +19,7 @@ import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
+import com.facebook.react.bridge.UiThreadUtil;
 import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.module.annotations.ReactModule;
 import com.rongtaprinter.utils.BaseEnum;
@@ -38,17 +40,22 @@ import com.rt.printerlibrary.factory.connect.WiFiFactory;
 import com.rt.printerlibrary.factory.printer.PrinterFactory;
 import com.rt.printerlibrary.factory.printer.UniversalPrinterFactory;
 import com.rt.printerlibrary.ipscan.IpScanner;
+import com.rt.printerlibrary.observer.PrinterObserver;
+import com.rt.printerlibrary.observer.PrinterObserverManager;
 import com.rt.printerlibrary.printer.RTPrinter;
 import com.rt.printerlibrary.setting.BitmapSetting;
 import com.rt.printerlibrary.setting.CommonSetting;
+import com.rt.printerlibrary.utils.FuncUtils;
+import com.rt.printerlibrary.utils.PrintStatusCmd;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 @ReactModule(name = RNRongtaPrinterModule.NAME)
-public class RNRongtaPrinterModule extends ReactContextBaseJavaModule {
+public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements PrinterObserver {
 
   private Object configObj;
 
@@ -84,15 +91,26 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule {
   }
 
   public void setCurrentConnectType(int currentConnectType) {
+    switch (currentConnectType) {
+      case BaseEnum.CMD_ESC:
+        printStatusCmd = PrintStatusCmd.cmd_print_100402;
+        break;
+      case BaseEnum.CMD_TSC:
+        printStatusCmd = PrintStatusCmd.cmd_Normal;
+        break;
+    }
     this.currentConnectType = currentConnectType;
   }
 
   private ArrayList<PrinterInterface> printerInterfaceArrayList = new ArrayList<>();
 
+  private PrintStatusCmd printStatusCmd = PrintStatusCmd.cmd_print_100402;
+
 
   private Promise mConnectDevicePromise;
   private Promise mConnectIPPromise;
   private Promise mPrintPromise;
+  private Promise mDisconnectPromise;
 
   public static final String NAME = "RNRongtaPrinter";
 
@@ -111,6 +129,7 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule {
   public void init() {
     printerFactory = new UniversalPrinterFactory();
     rtPrinter = printerFactory.create();
+    PrinterObserverManager.getInstance().add(this);
   }
 
   @Override
@@ -136,24 +155,7 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule {
     handleConnectType();
   }
 
-  private void connectUSB(UsbConfigBean usbConfigBean) {
-    UsbManager mUsbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
-    PIFactory piFactory = new UsbFactory();
-    PrinterInterface printerInterface = piFactory.create();
-    printerInterface.setConfigObject(usbConfigBean);
-    rtPrinter.setPrinterInterface(printerInterface);
 
-    if (mUsbManager.hasPermission(usbConfigBean.usbDevice)) {
-      try {
-        rtPrinter.connect(usbConfigBean);
-      } catch (Exception e) {
-        e.printStackTrace();
-      }
-    } else {
-      mUsbManager.requestPermission(usbConfigBean.usbDevice, usbConfigBean.pendingIntent);
-    }
-
-  }
 
 
   private void handleConnectType() {
@@ -169,8 +171,8 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule {
           public void onSearchFinish(List devicesList) {
             Log.d("rongta", "SCAN_FINISH-------------------");
             List<DeviceBean> deviceBeanList = (List<DeviceBean>) devicesList;
+            WritableArray writableArray = Arguments.createArray();
             if (deviceBeanList != null && deviceBeanList.size() != 0) {
-              WritableArray writableArray = Arguments.createArray();
               for (int i = 0; i < deviceBeanList.size(); i++) {
                 Map<String, Object> info = new HashMap<>();
                 if (deviceBeanList.get(i).getDeviceIp() != null) {
@@ -183,9 +185,9 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule {
                 info.put("DHCP", deviceBeanList.get(i).isDHCPEnable());
                 writableArray.pushMap(toWritableMap(info));
               }
-              if (mConnectDevicePromise != null) {
-                mConnectDevicePromise.resolve(writableArray);
-              }
+            }
+            if (mConnectDevicePromise != null) {
+              mConnectDevicePromise.resolve(writableArray);
             }
           }
 
@@ -200,8 +202,30 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule {
         break;
 
       case BaseEnum.CON_USB:
-        UsbConfigBean usbConfigBean = (UsbConfigBean) configObj;
-        connectUSB(usbConfigBean);
+        List<UsbDevice> mList = new ArrayList<>();
+        UsbManager mUsbManager = (UsbManager) getReactApplicationContext().getSystemService(Context.USB_SERVICE);
+        HashMap<String, UsbDevice> deviceList = mUsbManager.getDeviceList();
+        Log.d("rongta", "deviceList size = " + deviceList.size());
+        Iterator<UsbDevice> deviceIterator = deviceList.values().iterator();
+        while (deviceIterator.hasNext()) {
+          UsbDevice device = deviceIterator.next();
+          Log.d("rongta", "device getDeviceName" + device.getDeviceName());
+          Log.d("rongta", "device getVendorId" + device.getVendorId());
+          Log.d("rongta", "device getProductId" + device.getProductId());
+          mList.add(device);
+        }
+        if (mConnectDevicePromise != null) {
+          WritableArray writableArray = Arguments.createArray();
+          for (int i = 0; i < mList.size(); i++) {
+            Map<String, Object> info = new HashMap<>();
+            info.put("DEVICE_NAME", mList.get(i).getDeviceName());
+            info.put("VENDOR_ID", mList.get(i).getVendorId());
+            info.put("PRODUCT_ID", mList.get(i).getProductId());
+            info.put("DEVICE_ID", mList.get(i).getDeviceId());
+            writableArray.pushMap(toWritableMap(info));
+          }
+          mConnectDevicePromise.resolve(writableArray);
+        }
         break;
 
       default:
@@ -263,9 +287,31 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule {
         WiFiConfigBean wiFiConfigBean = (WiFiConfigBean) configObj;
         connectWifi(wiFiConfigBean);
         break;
+      case BaseEnum.CON_USB:
+        UsbConfigBean usbConfigBean = (UsbConfigBean) configObj;
+        connectUSB(usbConfigBean);
+        break;
     }
   }
 
+  private void connectUSB(UsbConfigBean usbConfigBean) {
+    UsbManager mUsbManager = (UsbManager) getReactApplicationContext().getSystemService(Context.USB_SERVICE);
+    PIFactory piFactory = new UsbFactory();
+    PrinterInterface printerInterface = piFactory.create();
+    printerInterface.setConfigObject(usbConfigBean);
+    rtPrinter.setPrinterInterface(printerInterface);
+
+    if (mUsbManager.hasPermission(usbConfigBean.usbDevice)) {
+      try {
+        rtPrinter.connect(usbConfigBean);
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+    } else {
+      mUsbManager.requestPermission(usbConfigBean.usbDevice, usbConfigBean.pendingIntent);
+    }
+
+  }
 
   @ReactMethod
   public void cutAll(Promise promise) {
@@ -358,4 +404,62 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule {
       mPrintPromise.reject(e);
     }
   }
+
+  @ReactMethod
+  private void doDisConnect(Promise promise) {
+    if (rtPrinter != null && rtPrinter.getPrinterInterface() != null) {
+      try {
+        rtPrinter.disConnect();
+        promise.resolve(true);
+      } catch (Exception e) {
+        promise.reject(e);
+      }
+    }
+  }
+
+  @Override
+  public void printerObserverCallback(PrinterInterface printerInterface, int state) {
+    UiThreadUtil.runOnUiThread(new Runnable() {
+      @Override
+      public void run() {
+        switch (state) {
+          case CommonEnum.CONNECT_STATE_SUCCESS:
+            //            setPrintEnable(true)
+            Log.i("rongta", "printerObserverCallback: enable: true");
+            break;
+          case CommonEnum.CONNECT_STATE_INTERRUPTED:
+            Log.i("rongta", "printerObserverCallback: enable: false");
+//            setPrintEnable(false);
+            break;
+          default:
+            break;
+        }
+      }
+    });
+  }
+
+  @Override
+  public void printerReadMsgCallback(PrinterInterface printerInterface, byte[] bytes) {
+    Log.i("rongta", "printerReadMsgCallback: "+ FuncUtils.ByteArrToHex(bytes));
+  }
+
+  @ReactMethod
+  public void cashBox() {
+    if (rtPrinter != null) {
+      CmdFactory cmdFactory = new EscFactory();
+      Cmd cmd = cmdFactory.create();
+      cmd.append(cmd.getOpenMoneyBoxCmd());//Open cashbox use default setting[0x00,0x20,0x01]
+      rtPrinter.writeMsgAsync(cmd.getAppendCmds());
+    }
+  }
+
+  @ReactMethod
+  public void getPrintStatus() {
+    if (rtPrinter == null) return;
+    CmdFactory cmdFactory = new EscFactory();
+    Cmd cmd = cmdFactory.create();
+    rtPrinter.writeMsgAsync(cmd.getPrintStausCmd(printStatusCmd));
+    Log.d("rongta", "getPrintStatus: " + printStatusCmd);
+  }
+
 }
