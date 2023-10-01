@@ -32,19 +32,37 @@ export default function App() {
       });
   };
 
+  const discoveryLan = () => {
+    deviceDiscovery(CMD_TYPE.CMD_ESC, CONNECT_TYPE.CON_WIFI)
+      .then((res) => {
+        console.log('res', res);
+        onSetDevice('end discovery success');
+        handleConnect(res);
+      })
+      .catch((er) => {
+        onSetDevice('end discovery error');
+        console.log('er', er);
+      });
+  };
+
+  const discoveryUsb = () => {
+    deviceDiscovery(CMD_TYPE.CMD_TSC, CONNECT_TYPE.CON_USB)
+      .then((res) => {
+        console.log('res', res);
+        onSetDevice('end discovery success');
+        // handleConnect(res);
+      })
+      .catch((er) => {
+        onSetDevice('end discovery error');
+        console.log('er', er);
+      });
+  };
+
   React.useEffect(() => {
     setTimeout(() => {
       onSetDevice('start discovery');
-      deviceDiscovery(CMD_TYPE.CMD_ESC, CONNECT_TYPE.CON_WIFI)
-        .then((res) => {
-          console.log('res', res);
-          onSetDevice('end discovery success');
-          handleConnect(res);
-        })
-        .catch((er) => {
-          onSetDevice('end discovery error');
-          console.log('er', er);
-        });
+      // discoveryLan();
+      discoveryUsb();
     }, 2000);
   }, []);
 
