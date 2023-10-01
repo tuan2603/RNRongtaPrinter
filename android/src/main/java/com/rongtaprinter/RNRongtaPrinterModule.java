@@ -3,14 +3,15 @@ package com.rongtaprinter;
 
 import static com.rongtaprinter.utils.MapUtil.toWritableMap;
 
+import android.app.PendingIntent;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.util.Base64;
 import android.util.Log;
-import android.view.View;
 
 import androidx.annotation.NonNull;
 
@@ -279,20 +280,39 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
 
 
   @ReactMethod
-  public void connect(int cmdType, int connectType, String deviceIp, int devicePort, Promise promise) {
+  public void connect(int cmdType, int connectType, String deviceIp, int devicePort, int deviceId, int vendorId,  Promise promise) {
     setCurrentCmdType(cmdType);
     setCurrentConnectType(connectType);
     mConnectIPPromise = promise;
-    configObj = new WiFiConfigBean(deviceIp, devicePort);
-    isConfigPrintEnable(configObj);
+
     switch (connectType) {
       case BaseEnum.CON_WIFI:
+        configObj = new WiFiConfigBean(deviceIp, devicePort);
+        isConfigPrintEnable(configObj);
         WiFiConfigBean wiFiConfigBean = (WiFiConfigBean) configObj;
         connectWifi(wiFiConfigBean);
         break;
       case BaseEnum.CON_USB:
-        UsbConfigBean usbConfigBean = (UsbConfigBean) configObj;
-        connectUSB(usbConfigBean);
+        UsbManager mUsbManager = (UsbManager) getReactApplicationContext().getSystemService(Context.USB_SERVICE);
+        HashMap<String, UsbDevice> deviceList = mUsbManager.getDeviceList();
+        Iterator<UsbDevice> deviceIterator = deviceList.values().iterator();
+        UsbDevice myUsbDevice = null;
+        while (deviceIterator.hasNext()) {
+          UsbDevice device = deviceIterator.next();
+          if(device.getVendorId() == vendorId || device.getDeviceId() == deviceId){
+            myUsbDevice = device;
+          }
+        }
+        if(myUsbDevice != null) {
+          PendingIntent mPermissionIntent = PendingIntent.getBroadcast(
+            getReactApplicationContext(),
+            0,
+            new Intent(this.getReactApplicationContext().getPackageName()),
+            PendingIntent.FLAG_IMMUTABLE);
+          configObj = new UsbConfigBean(getReactApplicationContext(), myUsbDevice, mPermissionIntent);
+          UsbConfigBean usbConfigBean = (UsbConfigBean) configObj;
+          connectUSB(usbConfigBean);
+        }
         break;
     }
   }
@@ -303,17 +323,21 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
     PrinterInterface printerInterface = piFactory.create();
     printerInterface.setConfigObject(usbConfigBean);
     rtPrinter.setPrinterInterface(printerInterface);
-
     if (mUsbManager.hasPermission(usbConfigBean.usbDevice)) {
       try {
         rtPrinter.connect(usbConfigBean);
+        if (mConnectIPPromise != null) {
+          mConnectIPPromise.resolve(true);
+        }
       } catch (Exception e) {
         e.printStackTrace();
+        if (mConnectIPPromise != null) {
+          mConnectIPPromise.resolve(false);
+        }
       }
     } else {
       mUsbManager.requestPermission(usbConfigBean.usbDevice, usbConfigBean.pendingIntent);
     }
-
   }
 
   @ReactMethod
@@ -475,10 +499,16 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
           case CommonEnum.CONNECT_STATE_SUCCESS:
             //            setPrintEnable(true)
             Log.i("rongta", "printerObserverCallback: enable: true");
+            if (mConnectIPPromise != null) {
+              mConnectIPPromise.resolve(true);
+            }
             break;
           case CommonEnum.CONNECT_STATE_INTERRUPTED:
             Log.i("rongta", "printerObserverCallback: enable: false");
 //            setPrintEnable(false);
+            if (mConnectIPPromise != null) {
+              mConnectIPPromise.reject(new Throwable("connect fail"));
+            }
             break;
           default:
             break;

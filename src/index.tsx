@@ -43,12 +43,21 @@ export function deviceDiscovery(
 
 //String deviceIp, int devicePort
 export function connectDevice(
-  cmdType: number,
-  connectType: number,
-  deviceIp: string,
-  devicePort: number
+  cmdType: number = CONNECT_TYPE.CON_WIFI,
+  connectType: number = CMD_TYPE.CMD_TSC,
+  deviceIp: string = '',
+  devicePort: number = 0,
+  deviceId: number = 0,
+  vendorId: number = 0
 ): Promise<any> {
-  return RNRongtaPrinter.connect(cmdType, connectType, deviceIp, devicePort);
+  return RNRongtaPrinter.connect(
+    cmdType,
+    connectType,
+    deviceIp,
+    devicePort,
+    deviceId,
+    vendorId
+  );
 }
 
 export function cutAllPage(): Promise<any> {
