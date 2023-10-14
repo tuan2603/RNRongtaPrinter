@@ -18,38 +18,34 @@ const RNRongtaPrinter = NativeModules.RNRongtaPrinter
     );
 
 const { CON_WIFI, CON_USB, CMD_ESC, CMD_TSC } = RNRongtaPrinter.getConstants();
-const CONNECT_TYPE = {
+const CONNECT_TYPE: { CON_WIFI: number, CON_USB: number } = {
   CON_WIFI,
   CON_USB,
 };
 
-const CMD_TYPE = {
+const CMD_TYPE: { CMD_ESC: number, CMD_TSC: number }  = {
   CMD_ESC,
   CMD_TSC,
 };
 
 export { CONNECT_TYPE, CMD_TYPE };
 
-export function multiply(a: number, b: number): Promise<number> {
-  return RNRongtaPrinter.multiply(a, b);
-}
-
-export function deviceDiscovery(
-  cmdType: number,
-  connectType: number
-): Promise<any> {
+const deviceDiscovery = (
+  cmdType: number = CMD_TYPE.CMD_ESC,
+  connectType: number = CONNECT_TYPE.CON_WIFI,
+): Promise<any> => {
   return RNRongtaPrinter.deviceDiscovery(cmdType, connectType);
 }
 
 //String deviceIp, int devicePort
-export function connectDevice(
-  cmdType: number = CONNECT_TYPE.CON_WIFI,
-  connectType: number = CMD_TYPE.CMD_TSC,
+const connectDevice = (
+  cmdType: number = CMD_TYPE.CMD_ESC,
+  connectType: number = CONNECT_TYPE.CON_WIFI,
   deviceIp: string = '',
   devicePort: number = 0,
   deviceId: number = 0,
   vendorId: number = 0
-): Promise<any> {
+): Promise<any>  => {
   return RNRongtaPrinter.connect(
     cmdType,
     connectType,
@@ -60,21 +56,31 @@ export function connectDevice(
   );
 }
 
-export function cutAllPage(): Promise<any> {
+const cutAllPage = (): Promise<any> => {
   return RNRongtaPrinter.cutAll();
 }
-export function printBase64(
+const printBase64 = (
   base64: string,
   width: number,
-  cmdType: number
-): Promise<any> {
+  cmdType: number = CMD_TYPE.CMD_ESC
+): Promise<any> =>  {
   return RNRongtaPrinter.printBase64(base64, width, cmdType);
 }
 
-export function disconnect(): Promise<any> {
+const disconnect = (): Promise<any> => {
   return RNRongtaPrinter.doDisConnect();
 }
 
-export function cashBox() {
+const cashBox = () => {
   return RNRongtaPrinter.cashBox();
+}
+
+
+export default {
+  cashBox,
+  disconnect,
+  printBase64,
+  cutAllPage,
+  connectDevice,
+  deviceDiscovery
 }

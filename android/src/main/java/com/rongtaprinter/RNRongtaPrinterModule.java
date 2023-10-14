@@ -389,7 +389,7 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
         int mWidth = bitmap.getWidth();
         cmd.append(cmd.getCommonSettingCmd(commonSetting));
         BitmapSetting bitmapSetting = new BitmapSetting();
-        BmpPrintMode mode = BmpPrintMode.MODE_SINGLE_FAST;
+        BmpPrintMode mode = BmpPrintMode.MODE_SINGLE_COLOR;
         bitmapSetting.setBmpPrintMode(mode);
         bitmapSetting.setBimtapLimitWidth(width);
         Bitmap mBitmap = Bitmap.createScaledBitmap(bitmap, width, width * mHeight / mWidth, false);
@@ -410,47 +410,7 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
       start();
   }
 
-  private void tscPrint(Bitmap bitmap, int width) {
-    new Thread(new Runnable() {
-      @Override
-      public void run() {
-        Log.d("rongta", "tscPrint: start");
-        CmdFactory cmdFactory = new TscFactory();
-        Cmd cmd = cmdFactory.create();
-        cmd.append(cmd.getHeaderCmd());
-        CommonSetting commonSetting = new CommonSetting();
-        int mHeight = bitmap.getHeight();
-        int mWidth = bitmap.getWidth();
-        int bmpPrintWidth = width;
-        int bmpPrintHeight = width * mHeight / mWidth;
-        commonSetting.setLableSizeBean(new LableSizeBean(bmpPrintWidth, bmpPrintHeight));
-        commonSetting.setLabelGap(3);
-        commonSetting.setPrintDirection(PrintDirection.NORMAL);
-        cmd.append(cmd.getHeaderCmd());
-        cmd.append(cmd.getCommonSettingCmd(commonSetting));
-        BitmapSetting bitmapSetting = new BitmapSetting();
-        BmpPrintMode mode = BmpPrintMode.MODE_SINGLE_FAST;
-        bitmapSetting.setPrintPostion(new Position(0, 0));
-        bitmapSetting.setBimtapLimitWidth(width);
-        bitmapSetting.setBmpPrintMode(BmpPrintMode.MODE_MULTI_COLOR);
-        Bitmap mBitmap = Bitmap.createScaledBitmap(bitmap, bmpPrintWidth, bmpPrintHeight, false);
-        try {
-          cmd.append(cmd.getBitmapCmd(bitmapSetting, mBitmap));
-          cmd.append(cmd.getPrintCopies(1));
-        } catch (SdkException e) {
-          mPrintPromise.reject(e);
-          e.printStackTrace();
-        }
-        cmd.append(cmd.getLFCRCmd());
-        cmd.append(cmd.getCmdCutNew());
-        if (rtPrinter != null) {
-          rtPrinter.writeMsgAsync(cmd.getAppendCmds());//Sync Write
-          mPrintPromise.resolve(true);
-        }
-      }
-    }).
-      start();
-  }
+
 
   @ReactMethod
   public void printBase64(String base64, int width, int cmdType, Promise promise) {
@@ -459,12 +419,9 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
       Bitmap bitmap = base64ToBitmap(base64);
       if (bitmap != null) {
         switch (cmdType) {
+          case BaseEnum.CMD_TSC:
           case BaseEnum.CMD_ESC:
             escPrint(bitmap, width);
-            break;
-
-          case BaseEnum.CMD_TSC:
-            tscPrint(bitmap, width);
             break;
           default:
             break;
