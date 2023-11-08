@@ -18,12 +18,12 @@ const RNRongtaPrinter = NativeModules.RNRongtaPrinter
     );
 
 const { CON_WIFI, CON_USB, CMD_ESC, CMD_TSC } = RNRongtaPrinter.getConstants();
-const CONNECT_TYPE: { CON_WIFI: number, CON_USB: number } = {
+const CONNECT_TYPE: { CON_WIFI: number; CON_USB: number } = {
   CON_WIFI,
   CON_USB,
 };
 
-const CMD_TYPE: { CMD_ESC: number, CMD_TSC: number }  = {
+const CMD_TYPE: { CMD_ESC: number; CMD_TSC: number } = {
   CMD_ESC,
   CMD_TSC,
 };
@@ -32,10 +32,10 @@ export { CONNECT_TYPE, CMD_TYPE };
 
 const deviceDiscovery = (
   cmdType: number = CMD_TYPE.CMD_ESC,
-  connectType: number = CONNECT_TYPE.CON_WIFI,
+  connectType: number = CONNECT_TYPE.CON_WIFI
 ): Promise<any> => {
   return RNRongtaPrinter.deviceDiscovery(cmdType, connectType);
-}
+};
 
 //String deviceIp, int devicePort
 const connectDevice = (
@@ -45,7 +45,7 @@ const connectDevice = (
   devicePort: number = 0,
   deviceId: number = 0,
   vendorId: number = 0
-): Promise<any>  => {
+): Promise<any> => {
   return RNRongtaPrinter.connect(
     cmdType,
     connectType,
@@ -54,27 +54,30 @@ const connectDevice = (
     deviceId,
     vendorId
   );
-}
+};
 
 const cutAllPage = (): Promise<any> => {
   return RNRongtaPrinter.cutAll();
-}
+};
 const printBase64 = (
   base64: string,
   width: number,
   cmdType: number = CMD_TYPE.CMD_ESC
-): Promise<any> =>  {
+): Promise<any> => {
   return RNRongtaPrinter.printBase64(base64, width, cmdType);
-}
+};
 
 const disconnect = (): Promise<any> => {
   return RNRongtaPrinter.doDisConnect();
-}
+};
 
 const cashBox = () => {
   return RNRongtaPrinter.cashBox();
-}
+};
 
+const getPrintStatus = (): Promise<any> => {
+  return RNRongtaPrinter.getPrintStatus();
+};
 
 export default {
   cashBox,
@@ -82,5 +85,6 @@ export default {
   printBase64,
   cutAllPage,
   connectDevice,
-  deviceDiscovery
-}
+  deviceDiscovery,
+  getPrintStatus,
+};

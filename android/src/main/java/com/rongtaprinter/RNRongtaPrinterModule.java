@@ -24,18 +24,14 @@ import com.facebook.react.bridge.UiThreadUtil;
 import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.module.annotations.ReactModule;
 import com.rongtaprinter.utils.BaseEnum;
-import com.rt.printerlibrary.bean.LableSizeBean;
-import com.rt.printerlibrary.bean.Position;
 import com.rt.printerlibrary.bean.UsbConfigBean;
 import com.rt.printerlibrary.bean.WiFiConfigBean;
 import com.rt.printerlibrary.cmd.Cmd;
 import com.rt.printerlibrary.cmd.EscFactory;
-import com.rt.printerlibrary.cmd.TscFactory;
 import com.rt.printerlibrary.connect.PrinterInterface;
 import com.rt.printerlibrary.enumerate.BmpPrintMode;
 import com.rt.printerlibrary.enumerate.CommonEnum;
 import com.rt.printerlibrary.enumerate.ConnectStateEnum;
-import com.rt.printerlibrary.enumerate.PrintDirection;
 import com.rt.printerlibrary.exception.SdkException;
 import com.rt.printerlibrary.factory.cmd.CmdFactory;
 import com.rt.printerlibrary.factory.connect.PIFactory;
@@ -61,27 +57,11 @@ import java.util.Map;
 @ReactModule(name = RNRongtaPrinterModule.NAME)
 public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements PrinterObserver {
 
-  private Object configObj;
-
-  private RTPrinter rtPrinter;
-
-  private PrinterFactory printerFactory;
-
-  public RTPrinter getRtPrinter() {
-    return rtPrinter;
-  }
-
-
-  public void setRtPrinter(RTPrinter rtPrinter) {
-    this.rtPrinter = rtPrinter;
-  }
+  private RTPrinter rtPrinter = null;
 
 
   private int currentCmdType = BaseEnum.CMD_ESC;
 
-  public int getCurrentCmdType() {
-    return currentCmdType;
-  }
 
   public void setCurrentCmdType(int currentCmdType) {
     this.currentCmdType = currentCmdType;
@@ -114,7 +94,6 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
   private Promise mConnectDevicePromise;
   private Promise mConnectIPPromise;
   private Promise mPrintPromise;
-  private Promise mDisconnectPromise;
 
   public static final String NAME = "RNRongtaPrinter";
 
@@ -131,7 +110,7 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
 
 
   public void init() {
-    printerFactory = new UniversalPrinterFactory();
+    PrinterFactory printerFactory = new UniversalPrinterFactory();
     rtPrinter = printerFactory.create();
     PrinterObserverManager.getInstance().add(this);
   }
@@ -287,7 +266,7 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
 
     switch (connectType) {
       case BaseEnum.CON_WIFI:
-        configObj = new WiFiConfigBean(deviceIp, devicePort);
+        Object configObj = new WiFiConfigBean(deviceIp, devicePort);
         isConfigPrintEnable(configObj);
         WiFiConfigBean wiFiConfigBean = (WiFiConfigBean) configObj;
         connectWifi(wiFiConfigBean);
@@ -379,7 +358,6 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
     new Thread(new Runnable() {
       @Override
       public void run() {
-        Log.d("rongta", "escPrint: start");
         CmdFactory cmdFactory = new EscFactory();
         Cmd cmd = cmdFactory.create();
         cmd.append(cmd.getHeaderCmd());
