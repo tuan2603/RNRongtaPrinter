@@ -1,13 +1,10 @@
 import * as React from 'react';
 import { useState } from 'react';
 
-import {Button, StyleSheet, Text, View} from 'react-native';
-import Rongta, {
-  CMD_TYPE,
-  CONNECT_TYPE,
-} from 'react-native-rongta-printer';
+import { Button, StyleSheet, Text, View } from 'react-native';
+import Rongta, { CMD_TYPE, CONNECT_TYPE } from 'react-native-rongta-printer';
 import _, { get } from 'lodash';
-import {BILL_RECEIPT} from "./data";
+import { BILL_RECEIPT } from './data';
 
 export default function App() {
   const [device, setDevice] = useState('open');
@@ -37,18 +34,10 @@ export default function App() {
     const vendorId: number = get(res, '0.VENDOR_ID');
     onSetDevice(`deviceId:${deviceId} - vendorId:${vendorId}`);
     onSetDevice(`start connect usb`);
-    Rongta.connectDevice(
-      cmd,
-      CONNECT_TYPE.CON_USB,
-      '',
-      0,
-      deviceId,
-      vendorId
-    )
+    Rongta.connectDevice(cmd, CONNECT_TYPE.CON_USB, '', 0, deviceId, vendorId)
       .then((_res) => {
         onSetDevice('end connect usb success');
         console.log('connect', _res);
-
       })
       .catch((_er) => {
         onSetDevice('end connect wifi error');
@@ -56,7 +45,6 @@ export default function App() {
       });
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const discoveryLan = (cmd: number = CMD_TYPE.CMD_TSC) => {
     Rongta.deviceDiscovery(cmd, CONNECT_TYPE.CON_WIFI)
       .then((res) => {
@@ -70,7 +58,6 @@ export default function App() {
       });
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const discoveryUsb = (cmd: number = CMD_TYPE.CMD_TSC) => {
     onSetDevice('start discovery');
     Rongta.deviceDiscovery(cmd, CONNECT_TYPE.CON_USB)
@@ -87,14 +74,13 @@ export default function App() {
 
   const printImageBase64 = (cmd: number = CMD_TYPE.CMD_ESC) => {
     Rongta.printBase64(BILL_RECEIPT, 600, cmd)
-      .then(res => {
+      .then((res) => {
         onSetDevice('print success: ' + res);
       })
-      .catch(er => {
+      .catch((er) => {
         onSetDevice('print error: ' + JSON.stringify(er));
-      })
-  }
-
+      });
+  };
 
   React.useEffect(() => {
     setTimeout(() => {
@@ -105,31 +91,55 @@ export default function App() {
   return (
     <View style={styles.container}>
       <Text>Result: {device || 'open'}</Text>
-      <View style={{height: 16}} />
-      <Button title={'connect usb tsc'} onPress={() => {
-        discoveryUsb()
-      }} />
-      <View style={{height: 16}} />
-      <Button title={'connect usb esc'} onPress={() => {
-        discoveryUsb(CMD_TYPE.CMD_ESC)
-      }} />
-      <View style={{height: 16}} />
-      <Button title={'connect lan tsc'} onPress={() => {
-        discoveryLan()
-      }} />
-      <View style={{height: 16}} />
-      <Button title={'connect lan esc'} onPress={() => {
-        discoveryLan(CMD_TYPE.CMD_ESC)
-      }} />
-      <View style={{height: 16}} />
-      <Button title={'print esc'} onPress={() => {
-        printImageBase64(CMD_TYPE.CMD_ESC)
-      }} />
-      <View style={{height: 16}} />
-      <Button title={'print tsc'} onPress={() => {
-        printImageBase64(CMD_TYPE.CMD_TSC)
-      }} />
-      <View style={{height: 16}} />
+      <View style={{ height: 16 }} />
+      <Button
+        title={'connect usb tsc'}
+        onPress={() => {
+          discoveryUsb();
+        }}
+      />
+      <View style={{ height: 16 }} />
+      <Button
+        title={'connect usb esc'}
+        onPress={() => {
+          discoveryUsb(CMD_TYPE.CMD_ESC);
+        }}
+      />
+      <View style={{ height: 16 }} />
+      <Button
+        title={'connect lan tsc'}
+        onPress={() => {
+          discoveryLan();
+        }}
+      />
+      <View style={{ height: 16 }} />
+      <Button
+        title={'connect lan esc'}
+        onPress={() => {
+          discoveryLan(CMD_TYPE.CMD_ESC);
+        }}
+      />
+      <View style={{ height: 16 }} />
+      <Button
+        title={'print esc'}
+        onPress={() => {
+          printImageBase64(CMD_TYPE.CMD_ESC);
+        }}
+      />
+      <View style={{ height: 16 }} />
+      <Button
+        title={'print tsc'}
+        onPress={() => {
+          printImageBase64(CMD_TYPE.CMD_TSC);
+        }}
+      />
+      <Button
+        title={'print status'}
+        onPress={async () => {
+          console.log(await Rongta.getStatus());
+        }}
+      />
+      <View style={{ height: 16 }} />
     </View>
   );
 }
