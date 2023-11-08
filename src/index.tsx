@@ -75,7 +75,7 @@ const cashBox = () => {
   return RNRongtaPrinter.cashBox();
 };
 
-const getPrintStatus = (): Promise<any> => {
+const getStatus = (): Promise<any> => {
   return RNRongtaPrinter.getPrintStatus();
 };
 
@@ -86,5 +86,5 @@ export default {
   cutAllPage,
   connectDevice,
   deviceDiscovery,
-  getPrintStatus,
+  getStatus,
 };
