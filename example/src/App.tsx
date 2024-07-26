@@ -91,58 +91,52 @@ export default function App() {
   return (
     <View style={styles.container}>
       <Text>Result: {device || 'open'}</Text>
-      <View style={{ height: 16 }} />
-      <Button
-        title={'connect usb tsc'}
-        onPress={() => {
-          discoveryUsb();
-        }}
-      />
-      <View style={{ height: 16 }} />
+      <SizeBox />
+
       <Button
         title={'connect usb esc'}
         onPress={() => {
           discoveryUsb(CMD_TYPE.CMD_ESC);
         }}
       />
-      <View style={{ height: 16 }} />
-      <Button
-        title={'connect lan tsc'}
-        onPress={() => {
-          discoveryLan();
-        }}
-      />
-      <View style={{ height: 16 }} />
+      <SizeBox />
+
       <Button
         title={'connect lan esc'}
         onPress={() => {
           discoveryLan(CMD_TYPE.CMD_ESC);
         }}
       />
-      <View style={{ height: 16 }} />
+      <SizeBox />
+
       <Button
         title={'print esc'}
         onPress={() => {
           printImageBase64(CMD_TYPE.CMD_ESC);
         }}
       />
-      <View style={{ height: 16 }} />
-      <Button
-        title={'print tsc'}
-        onPress={() => {
-          printImageBase64(CMD_TYPE.CMD_TSC);
-        }}
-      />
+      <SizeBox />
+
       <Button
         title={'print status'}
-        onPress={async () => {
-          console.log(await Rongta.getStatus());
+        onPress={() => {
+          Rongta.getStatus()
+            .then((res) => {
+              console.log('res', res);
+            })
+            .catch((er) => {
+              console.log('er', er);
+            });
         }}
       />
-      <View style={{ height: 16 }} />
+      <SizeBox />
     </View>
   );
 }
+
+const SizeBox = ({ size = 16 }: { size?: number }) => {
+  return <View style={{ height: size, width: size }} />;
+};
 
 const styles = StyleSheet.create({
   container: {

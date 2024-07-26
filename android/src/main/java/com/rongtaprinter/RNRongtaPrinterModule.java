@@ -32,6 +32,7 @@ import com.rt.printerlibrary.connect.PrinterInterface;
 import com.rt.printerlibrary.enumerate.BmpPrintMode;
 import com.rt.printerlibrary.enumerate.CommonEnum;
 import com.rt.printerlibrary.enumerate.ConnectStateEnum;
+import com.rt.printerlibrary.enumerate.Print80StatusCmd;
 import com.rt.printerlibrary.exception.SdkException;
 import com.rt.printerlibrary.factory.cmd.CmdFactory;
 import com.rt.printerlibrary.factory.connect.PIFactory;
@@ -56,6 +57,8 @@ import java.util.Map;
 
 @ReactModule(name = RNRongtaPrinterModule.NAME)
 public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements PrinterObserver {
+
+  private static final String TAG = "RNRongtaPrinterModule";
 
   private RTPrinter rtPrinter = null;
 
@@ -153,25 +156,17 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
         new IpScanner() {
           @Override
           public void onSearchStart() {
-            Log.d("rongta", "SCAN_START-------------------");
+            Log.d(TAG, "SCAN_START-------------------");
           }
 
           @Override
           public void onSearchFinish(List devicesList) {
-            Log.d("rongta", "SCAN_FINISH-------------------");
+            Log.d(TAG, "SCAN_FINISH-------------------");
             List<DeviceBean> deviceBeanList = (List<DeviceBean>) devicesList;
             WritableArray writableArray = Arguments.createArray();
-            if (deviceBeanList != null && deviceBeanList.size() != 0) {
+            if (deviceBeanList != null && !deviceBeanList.isEmpty()) {
               for (int i = 0; i < deviceBeanList.size(); i++) {
-                Map<String, Object> info = new HashMap<>();
-                if (deviceBeanList.get(i).getDeviceIp() != null) {
-                  info.put("IP", deviceBeanList.get(i).getDeviceIp());
-                }
-                if (deviceBeanList.get(i).getMacAddress() != null) {
-                  info.put("MAC", deviceBeanList.get(i).getMacAddress());
-                }
-                info.put("PORT", deviceBeanList.get(i).getDevicePort());
-                info.put("DHCP", deviceBeanList.get(i).isDHCPEnable());
+                Map<String, Object> info = getStringObjectMap(deviceBeanList, i);
                 writableArray.pushMap(toWritableMap(info));
               }
             }
@@ -182,7 +177,7 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
 
           @Override
           public void onSearchError(String msg) {
-            Log.d("rongta", "SCAN_ERROR-------------------");
+            Log.d(TAG, "SCAN_ERROR-------------------");
             if (mConnectDevicePromise != null) {
               mConnectDevicePromise.reject("SCAN_ERROR", msg);
             }
@@ -194,13 +189,13 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
         List<UsbDevice> mList = new ArrayList<>();
         UsbManager mUsbManager = (UsbManager) getReactApplicationContext().getSystemService(Context.USB_SERVICE);
         HashMap<String, UsbDevice> deviceList = mUsbManager.getDeviceList();
-        Log.d("rongta", "deviceList size = " + deviceList.size());
+        Log.d(TAG, "deviceList size = " + deviceList.size());
         Iterator<UsbDevice> deviceIterator = deviceList.values().iterator();
         while (deviceIterator.hasNext()) {
           UsbDevice device = deviceIterator.next();
-          Log.d("rongta", "device getDeviceName" + device.getDeviceName());
-          Log.d("rongta", "device getVendorId" + device.getVendorId());
-          Log.d("rongta", "device getProductId" + device.getProductId());
+          Log.d(TAG, "device getDeviceName" + device.getDeviceName());
+          Log.d(TAG, "device getVendorId" + device.getVendorId());
+          Log.d(TAG, "device getProductId" + device.getProductId());
           mList.add(device);
         }
         if (mConnectDevicePromise != null) {
@@ -222,6 +217,19 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
     }
   }
 
+  private static @NonNull Map<String, Object> getStringObjectMap(List<IpScanner.DeviceBean> deviceBeanList, int i) {
+    Map<String, Object> info = new HashMap<>();
+    if (deviceBeanList.get(i).getDeviceIp() != null) {
+      info.put("IP", deviceBeanList.get(i).getDeviceIp());
+    }
+    if (deviceBeanList.get(i).getMacAddress() != null) {
+      info.put("MAC", deviceBeanList.get(i).getMacAddress());
+    }
+    info.put("PORT", deviceBeanList.get(i).getDevicePort());
+    info.put("DHCP", deviceBeanList.get(i).isDHCPEnable());
+    return info;
+  }
+
   private boolean isInConnectList(Object configObj) {
     boolean isInList = false;
     for (int i = 0; i < printerInterfaceArrayList.size(); i++) {
@@ -238,10 +246,10 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
 
   private void isConfigPrintEnable(Object configObj) {
     if (isInConnectList(configObj)) {
-      Log.d("rongta", "isConfigPrintEnable: true");
+      Log.d(TAG, "isConfigPrintEnable: true");
       setPrintEnable(true);
     } else {
-      Log.d("rongta", "isConfigPrintEnable: false");
+      Log.d(TAG, "isConfigPrintEnable: false");
       setPrintEnable(false);
     }
   }
@@ -357,14 +365,14 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
       byte[] byteArr = Base64.decode(base64, 0);
       bitmap = BitmapFactory.decodeByteArray(byteArr, 0, byteArr.length);
     } catch (Exception e) {
-      Log.d("rongta", "escPrint: base64ToBitmap");
+      Log.d(TAG, "escPrint: base64ToBitmap");
       e.printStackTrace();
       mPrintPromise.reject(e);
     }
     return bitmap;
   }
 
-  private void escPrint(Bitmap bitmap, int width) {
+  private void escPrint(Bitmap bitmap, int width, boolean isCut) {
     new Thread(new Runnable() {
       @Override
       public void run() {
@@ -389,7 +397,9 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
           return;
         }
         cmd.append(cmd.getLFCRCmd());
-        cmd.append(cmd.getCmdCutNew());
+        if(isCut) {
+          cmd.append(cmd.getCmdCutNew());
+        }
         if (rtPrinter != null) {
           rtPrinter.writeMsgAsync(cmd.getAppendCmds());
           mPrintPromise.resolve(true);
@@ -404,24 +414,17 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
 
 
   @ReactMethod
-  public void printBase64(String base64, int width, int cmdType, Promise promise) {
+  public void printBase64(String base64, int width, int cmdType, boolean isCut, Promise promise) {
     mPrintPromise = promise;
     try {
       Bitmap bitmap = base64ToBitmap(base64);
-      if (bitmap != null) {
-        switch (cmdType) {
-          case BaseEnum.CMD_TSC:
-          case BaseEnum.CMD_ESC:
-            escPrint(bitmap, width);
-            break;
-          default:
-            break;
-        }
+      if (bitmap != null && cmdType == BaseEnum.CMD_ESC) {
+        escPrint(bitmap, width, isCut);
       } else {
         mPrintPromise.reject(new Throwable("Not found data printer"));
       }
     } catch (Exception e) {
-      Log.d("rongta", "escPrint: printBase64");
+      Log.d(TAG, "escPrint: printBase64");
       mPrintPromise.reject(e);
     }
   }
@@ -446,20 +449,21 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
       public void run() {
         switch (state) {
           case CommonEnum.CONNECT_STATE_SUCCESS:
-            Log.i("rongta", "printerObserverCallback: enable: true");
+            Log.i(TAG, "printerObserverCallback: enable: true");
             setPrintEnable(true);
             if (mConnectIPPromise != null) {
               mConnectIPPromise.resolve(true);
             }
             break;
           case CommonEnum.CONNECT_STATE_INTERRUPTED:
-            Log.i("rongta", "printerObserverCallback: enable: false");
+            Log.i(TAG, "printerObserverCallback: enable: false");
             setPrintEnable(false);
             if (mConnectIPPromise != null) {
               mConnectIPPromise.reject(new Throwable("connect fail"));
             }
             break;
           default:
+            rtPrinter = null;
             break;
         }
       }
@@ -468,7 +472,8 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
 
   @Override
   public void printerReadMsgCallback(PrinterInterface printerInterface, byte[] bytes) {
-    Log.i("rongta", "printerReadMsgCallback: "+ FuncUtils.ByteArrToHex(bytes));
+    Log.i(TAG, "printerReadMsgCallback: "+ FuncUtils.ByteArrToHex(bytes));
+    mPrintStatusPromise.resolve(FuncUtils.ByteArrToHex(bytes));
   }
 
   @ReactMethod
@@ -484,17 +489,15 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
   @ReactMethod
   public void getPrintStatus(Promise promise) {
     mPrintStatusPromise = promise;
-    if (rtPrinter == null || !isEnable) {
-      mPrintStatusPromise.resolve(false);
+    if (rtPrinter == null) {
+      mPrintStatusPromise.reject("ERROR", ConnectStateEnum.NoConnect.name());
     } else {
-      if(rtPrinter.getConnectState() == ConnectStateEnum.NoConnect) {
-        mPrintStatusPromise.resolve(false);
+      if(rtPrinter.getConnectState() != ConnectStateEnum.Connected) {
+        mPrintStatusPromise.reject("ERROR", rtPrinter.getConnectState().name());
       } else {
         CmdFactory cmdFactory = new EscFactory();
         Cmd cmd = cmdFactory.create();
-        Log.d("rongta", "isEnable: " + isEnable);
-        Log.d("rongta", "getPrintStatus: " + rtPrinter.getConnectState());
-        rtPrinter.writeMsgAsync(cmd.getPrintStausCmd(printStatusCmd));
+        rtPrinter.writeMsgAsync(cmd.getPrint80StausCmd(Print80StatusCmd.cmd_IsPrinting));
         mPrintStatusPromise.resolve(true);
       }
     }

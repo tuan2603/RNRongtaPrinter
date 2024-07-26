@@ -59,12 +59,14 @@ const connectDevice = (
 const cutAllPage = (): Promise<any> => {
   return RNRongtaPrinter.cutAll();
 };
+
 const printBase64 = (
   base64: string,
   width: number,
-  cmdType: number = CMD_TYPE.CMD_ESC
+  cmdType: number = CMD_TYPE.CMD_ESC,
+  isCut: boolean = false
 ): Promise<any> => {
-  return RNRongtaPrinter.printBase64(base64, width, cmdType);
+  return RNRongtaPrinter.printBase64(base64, width, cmdType, isCut);
 };
 
 const disconnect = (): Promise<any> => {
