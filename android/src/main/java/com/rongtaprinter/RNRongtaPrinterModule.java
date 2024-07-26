@@ -491,10 +491,10 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
   public void getPrintStatus(Promise promise) {
     mPrintStatusPromise = promise;
     if (rtPrinter == null || !isEnable) {
-      mPrintStatusPromise.reject("ERROR", ConnectStateEnum.NoConnect.name());
+      mPrintStatusPromise.resolve(false);
     } else {
       if(rtPrinter.getConnectState() != ConnectStateEnum.Connected) {
-        mPrintStatusPromise.reject("ERROR", rtPrinter.getConnectState().name());
+        mPrintStatusPromise.resolve(false);
       } else {
         CmdFactory cmdFactory = new EscFactory();
         Cmd cmd = cmdFactory.create();
