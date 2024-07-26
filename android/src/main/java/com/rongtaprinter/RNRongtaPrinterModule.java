@@ -336,12 +336,16 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
   }
 
   @ReactMethod
-  public void cutAll(Promise promise) {
+  public void cutAll(Boolean isCutAll, Promise promise) {
     try {
       if (rtPrinter != null) {
         CmdFactory cmdFactory = new EscFactory();
         Cmd cmd = cmdFactory.create();
-        cmd.append(cmd.getAllCutCmd());
+        if(isCutAll) {
+          cmd.append(cmd.getAllCutCmd());
+        } else {
+          cmd.append(cmd.getHalfCutCmd());
+        }
         rtPrinter.writeMsgAsync(cmd.getAppendCmds());
         if (promise != null) {
           promise.resolve(true);
@@ -462,9 +466,6 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
               mConnectIPPromise.reject(new Throwable("connect fail"));
             }
             break;
-          default:
-            rtPrinter = null;
-            break;
         }
       }
     });
@@ -489,7 +490,7 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
   @ReactMethod
   public void getPrintStatus(Promise promise) {
     mPrintStatusPromise = promise;
-    if (rtPrinter == null) {
+    if (rtPrinter == null || !isEnable) {
       mPrintStatusPromise.reject("ERROR", ConnectStateEnum.NoConnect.name());
     } else {
       if(rtPrinter.getConnectState() != ConnectStateEnum.Connected) {

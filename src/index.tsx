@@ -56,8 +56,8 @@ const connectDevice = (
   );
 };
 
-const cutAllPage = (): Promise<any> => {
-  return RNRongtaPrinter.cutAll();
+const cutAllPage = (cutAll: boolean = false): Promise<any> => {
+  return RNRongtaPrinter.cutAll(cutAll);
 };
 
 const printBase64 = (
