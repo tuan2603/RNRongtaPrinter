@@ -121,7 +121,9 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
   public void init() {
     PrinterFactory printerFactory = new UniversalPrinterFactory();
     rtPrinter = printerFactory.create();
-    PrinterObserverManager.getInstance().add(this);
+    if(rtPrinter != null) {
+      PrinterObserverManager.getInstance().add(this);
+    }
   }
 
   @Override
@@ -213,7 +215,9 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
         break;
 
       default:
-        mConnectDevicePromise.reject("SCAN_ERROR", "Not find connect type");
+        if(mConnectDevicePromise != null) {
+          mConnectDevicePromise.reject("SCAN_ERROR", "Not find connect type");
+        }
     }
   }
 
@@ -259,16 +263,18 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
     PIFactory piFactory = new WiFiFactory();
     PrinterInterface printerInterface = piFactory.create();
     printerInterface.setConfigObject(wiFiConfigBean);
-    rtPrinter.setPrinterInterface(printerInterface);
-    try {
-      rtPrinter.connect(wiFiConfigBean);
-      if (mConnectIPPromise != null) {
-        mConnectIPPromise.resolve(true);
-      }
-    } catch (Exception e) {
-      e.printStackTrace();
-      if (mConnectIPPromise != null) {
-        mConnectIPPromise.resolve(false);
+    if(rtPrinter != null) {
+      rtPrinter.setPrinterInterface(printerInterface);
+      try {
+        rtPrinter.connect(wiFiConfigBean);
+        if (mConnectIPPromise != null) {
+          mConnectIPPromise.resolve(true);
+        }
+      } catch (Exception e) {
+        e.printStackTrace();
+        if (mConnectIPPromise != null) {
+          mConnectIPPromise.resolve(false);
+        }
       }
     }
   }
@@ -317,21 +323,23 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
     PIFactory piFactory = new UsbFactory();
     PrinterInterface printerInterface = piFactory.create();
     printerInterface.setConfigObject(usbConfigBean);
-    rtPrinter.setPrinterInterface(printerInterface);
-    if (mUsbManager.hasPermission(usbConfigBean.usbDevice)) {
-      try {
-        rtPrinter.connect(usbConfigBean);
-        if (mConnectIPPromise != null) {
-          mConnectIPPromise.resolve(true);
+    if(rtPrinter != null) {
+      rtPrinter.setPrinterInterface(printerInterface);
+      if (mUsbManager.hasPermission(usbConfigBean.usbDevice)) {
+        try {
+          rtPrinter.connect(usbConfigBean);
+          if (mConnectIPPromise != null) {
+            mConnectIPPromise.resolve(true);
+          }
+        } catch (Exception e) {
+          e.printStackTrace();
+          if (mConnectIPPromise != null) {
+            mConnectIPPromise.resolve(false);
+          }
         }
-      } catch (Exception e) {
-        e.printStackTrace();
-        if (mConnectIPPromise != null) {
-          mConnectIPPromise.resolve(false);
-        }
+      } else {
+        mUsbManager.requestPermission(usbConfigBean.usbDevice, usbConfigBean.pendingIntent);
       }
-    } else {
-      mUsbManager.requestPermission(usbConfigBean.usbDevice, usbConfigBean.pendingIntent);
     }
   }
 
@@ -371,7 +379,9 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
     } catch (Exception e) {
       Log.d(TAG, "escPrint: base64ToBitmap");
       e.printStackTrace();
-      mPrintPromise.reject(e);
+      if(mPrintPromise != null) {
+        mPrintPromise.reject(e);
+      }
     }
     return bitmap;
   }
@@ -397,7 +407,9 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
           cmd.append(cmd.getBitmapCmd(bitmapSetting, mBitmap));
         } catch (SdkException e) {
           e.printStackTrace();
-          mPrintPromise.reject(e);
+          if(mPrintPromise != null) {
+            mPrintPromise.reject(e);
+          }
           return;
         }
         cmd.append(cmd.getLFCRCmd());
@@ -406,9 +418,13 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
         }
         if (rtPrinter != null) {
           rtPrinter.writeMsgAsync(cmd.getAppendCmds());
-          mPrintPromise.resolve(true);
+          if(mPrintPromise != null) {
+            mPrintPromise.resolve(true);
+          }
         } else {
-          mPrintPromise.reject(new Throwable("printer fail"));
+          if(mPrintPromise != null) {
+            mPrintPromise.reject(new Throwable("printer fail"));
+          }
         }
       }
     }).
@@ -425,11 +441,15 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
       if (bitmap != null && cmdType == BaseEnum.CMD_ESC) {
         escPrint(bitmap, width, isCut);
       } else {
-        mPrintPromise.reject(new Throwable("Not found data printer"));
+        if(mPrintPromise != null) {
+          mPrintPromise.reject(new Throwable("Not found data printer"));
+        }
       }
     } catch (Exception e) {
       Log.d(TAG, "escPrint: printBase64");
-      mPrintPromise.reject(e);
+      if(mPrintPromise != null) {
+        mPrintPromise.reject(e);
+      }
     }
   }
 
@@ -439,9 +459,13 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
       try {
         rtPrinter.disConnect();
         setPrintEnable(false);
-        promise.resolve(true);
+        if(promise != null) {
+          promise.resolve(true);
+        }
       } catch (Exception e) {
-        promise.reject(e);
+        if(promise != null) {
+          promise.reject(e);
+        }
       }
     }
   }
@@ -491,15 +515,21 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
   public void getPrintStatus(Promise promise) {
     mPrintStatusPromise = promise;
     if (rtPrinter == null || !isEnable) {
-      mPrintStatusPromise.resolve(false);
+      if(mPrintStatusPromise != null) {
+        mPrintStatusPromise.resolve(false);
+      }
     } else {
       if(rtPrinter.getConnectState() != ConnectStateEnum.Connected) {
-        mPrintStatusPromise.resolve(false);
+        if(mPrintStatusPromise != null) {
+          mPrintStatusPromise.resolve(false);
+        }
       } else {
         CmdFactory cmdFactory = new EscFactory();
         Cmd cmd = cmdFactory.create();
         rtPrinter.writeMsgAsync(cmd.getPrint80StausCmd(Print80StatusCmd.cmd_IsPrinting));
-        mPrintStatusPromise.resolve(true);
+        if(mPrintStatusPromise != null) {
+          mPrintStatusPromise.resolve(true);
+        }
       }
     }
   }
