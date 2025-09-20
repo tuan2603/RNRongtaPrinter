@@ -65,6 +65,8 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
 
   private int currentCmdType = BaseEnum.CMD_ESC;
 
+  private int connected = 0;
+
 
   public void setCurrentCmdType(int currentCmdType) {
     this.currentCmdType = currentCmdType;
@@ -104,6 +106,7 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
 
   public RNRongtaPrinterModule(ReactApplicationContext reactContext) {
     super(reactContext);
+    PrinterObserverManager.getInstance().add(this);
     init();
   }
 
@@ -121,9 +124,6 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
   public void init() {
     PrinterFactory printerFactory = new UniversalPrinterFactory();
     rtPrinter = printerFactory.create();
-    if(rtPrinter != null) {
-      PrinterObserverManager.getInstance().add(this);
-    }
   }
 
   @Override
@@ -268,11 +268,13 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
       try {
         rtPrinter.connect(wiFiConfigBean);
         if (mConnectIPPromise != null) {
+          connected = 1;
           mConnectIPPromise.resolve(true);
         }
       } catch (Exception e) {
         e.printStackTrace();
         if (mConnectIPPromise != null) {
+          connected = 0;
           mConnectIPPromise.resolve(false);
         }
       }
@@ -329,11 +331,13 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
         try {
           rtPrinter.connect(usbConfigBean);
           if (mConnectIPPromise != null) {
+            connected = 1;
             mConnectIPPromise.resolve(true);
           }
         } catch (Exception e) {
           e.printStackTrace();
           if (mConnectIPPromise != null) {
+            connected = 0;
             mConnectIPPromise.resolve(false);
           }
         }
@@ -417,6 +421,7 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
           cmd.append(cmd.getCmdCutNew());
         }
         if (rtPrinter != null) {
+          //rtPrinter.writeMsg(cmd.appendCmds)
           rtPrinter.writeMsgAsync(cmd.getAppendCmds());
           if(mPrintPromise != null) {
             mPrintPromise.resolve(true);
@@ -455,10 +460,11 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
 
   @ReactMethod
   private void doDisConnect(Promise promise) {
-    if (rtPrinter != null && rtPrinter.getPrinterInterface() != null) {
+    if (rtPrinter != null && rtPrinter.getPrinterInterface() != null && connected == 1) {
       try {
         rtPrinter.disConnect();
         setPrintEnable(false);
+        connected = 0;
         if(promise != null) {
           promise.resolve(true);
         }
@@ -472,49 +478,59 @@ public class RNRongtaPrinterModule extends ReactContextBaseJavaModule implements
 
   @Override
   public void printerObserverCallback(PrinterInterface printerInterface, int state) {
-    UiThreadUtil.runOnUiThread(new Runnable() {
-      @Override
-      public void run() {
-        switch (state) {
-          case CommonEnum.CONNECT_STATE_SUCCESS:
-            Log.i(TAG, "printerObserverCallback: enable: true");
-            setPrintEnable(true);
-            if (mConnectIPPromise != null) {
-              mConnectIPPromise.resolve(true);
-            }
-            break;
-          case CommonEnum.CONNECT_STATE_INTERRUPTED:
-            Log.i(TAG, "printerObserverCallback: enable: false");
-            setPrintEnable(false);
-            if (mConnectIPPromise != null) {
-              mConnectIPPromise.reject(new Throwable("connect fail"));
-            }
-            break;
+    switch (state) {
+      case CommonEnum.CONNECT_STATE_SUCCESS:
+        Log.i(TAG, "printerObserverCallback: enable: true");
+        setPrintEnable(true);
+        if (mConnectIPPromise != null) {
+          mConnectIPPromise.resolve(true);
         }
-      }
-    });
+        break;
+      case CommonEnum.CONNECT_STATE_INTERRUPTED:
+        Log.i(TAG, "printerObserverCallback: enable: false");
+        setPrintEnable(false);
+        if (mConnectIPPromise != null) {
+          mConnectIPPromise.reject(new Throwable("connect fail"));
+        }
+        break;
+    }
   }
 
   @Override
-  public void printerReadMsgCallback(PrinterInterface printerInterface, byte[] bytes) {
-    Log.i(TAG, "printerReadMsgCallback: "+ FuncUtils.ByteArrToHex(bytes));
-    mPrintStatusPromise.resolve(FuncUtils.ByteArrToHex(bytes));
+  public void printerReadMsgCallback(PrinterInterface printerInterface, byte[] p1) {
+    if (p1 == null) {
+      Log.i("NativeRongtaModule", "Received null message from printer");
+      return;
+    }
+
+    Log.i(
+      "NativeRongtaModule",
+      "Received print status message: " + FuncUtils.ByteArrToHex(p1)
+    );
+
   }
 
   @ReactMethod
-  public void cashBox() {
-    if (rtPrinter != null) {
+  public void cashBox(Promise promise) {
+    if (rtPrinter != null && connected == 1) {
       CmdFactory cmdFactory = new EscFactory();
       Cmd cmd = cmdFactory.create();
       cmd.append(cmd.getOpenMoneyBoxCmd());//Open cashbox use default setting[0x00,0x20,0x01]
       rtPrinter.writeMsgAsync(cmd.getAppendCmds());
+      if(promise != null) {
+        promise.resolve(true);
+      }
+    } else {
+      if(promise != null) {
+        promise.reject(new Throwable("printer fail"));
+      }
     }
   }
 
   @ReactMethod
   public void getPrintStatus(Promise promise) {
     mPrintStatusPromise = promise;
-    if (rtPrinter == null || !isEnable) {
+    if (rtPrinter == null || !isEnable || connected == 0) {
       if(mPrintStatusPromise != null) {
         mPrintStatusPromise.resolve(false);
       }

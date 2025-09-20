@@ -73,7 +73,7 @@ const disconnect = (): Promise<any> => {
   return RNRongtaPrinter.doDisConnect();
 };
 
-const cashBox = () => {
+const cashBox = (): Promise<any> => {
   return RNRongtaPrinter.cashBox();
 };
 
